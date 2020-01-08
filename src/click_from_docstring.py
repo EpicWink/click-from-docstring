@@ -16,6 +16,75 @@ __all__ = ["command"]
 logger = lg.getLogger(__name__)
 
 
+class _NumberRange:
+    minimum = None
+    maximum = None
+    _root = True
+
+    def __class_getitem__(cls, item):
+        if not cls._root:
+            raise TypeError("Cannot respecify range")
+        minimum_, maximum_ = item
+
+        class _IntRange(cls):
+            minimum = minimum_
+            maximum = maximum_
+            _root = False
+        return _IntRange
+
+    def __new__(cls, *args, **kwargs):
+        if cls._root:
+            raise TypeError("Range not specified")
+        val = super().__new__(cls, *args, **kwargs)
+        if cls.minimum is not None and val < cls.minimum:
+            raise ValueError(
+                "{} less than minimum of {}".format(val, cls.minimum),
+            )
+        if cls.maximum is not None and val > cls.maximum:
+            raise ValueError(
+                "{} greater than maximum of {}".format(val, cls.maximum),
+            )
+        return val
+
+
+class IntRange(_NumberRange, int):
+    def __new__(cls, *args, **kwargs) -> int:
+        return super().__new__(cls, *args, **kwargs)
+
+
+class FloatRange(_NumberRange, float):
+    def __new__(cls, *args, **kwargs) -> float:
+        return super().__new__(cls, *args, **kwargs)
+
+
+class Choice(t.Union):
+    items = None
+
+    def __class_getitem__(cls, items):
+        items = {p if isinstance(p, type) else type(p) for p in items}
+        reduced_items = set()
+        for item in items:
+            if any(issubclass(item, item_) for item_ in reduced_items):
+                continue
+            for item_ in list(reduced_items):
+                if issubclass(item_, item):
+                    reduced_items.remove(item_)
+            reduced_items.add(item)
+        reduced_items = tuple(reduced_items)
+
+        class _Choice(cls):
+            items = reduced_items
+        return _Choice
+
+    def __new__(cls, *args, **kwargs):
+        if cls.items is None:
+            raise TypeError("Choices not specified")
+        val = super().__new__(cls, *args, **kwargs)
+        if type(args[0]) not in cls.items:
+            raise ValueError("%s not of a valid type" % val)
+        return val
+
+
 class _ParamArgs(enum.Enum):
     """Configuration of parameter arguments."""
     flag = "Option takes no arguments, eg '-v'"
