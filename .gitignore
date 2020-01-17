@@ -29,6 +29,7 @@ htmlcov/
 .cache
 .hypothesis/
 .pytest_cache/
+.tox/
 
 # Sphinx documentation
 docs/build/
